@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mnemo — Flashcard Studio</title>
+  <meta name="description" content="A beautiful, cloud-synced flashcard study app." />
+  <meta name="theme-color" content="#1a1a2e" />
+  <link rel="manifest" href="#" id="pwa-manifest" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─── Design Tokens ─────────────────────────────────── */
+    :root {
+      --bg:        #0f0f1a;
+      --surface:   #1a1a2e;
+      --surface2:  #22223b;
+      --border:    rgba(255,255,255,0.08);
+      --gold:      #e8c97a;
+      --gold2:     #f5dfa0;
+      --teal:      #4ecdc4;
+      --rose:      #ff6b8a;
+      --text:      #f0ede6;
+      --muted:     #8a8a9a;
+      --radius:    16px;
+      --radius-sm: 10px;
+      --shadow:    0 8px 40px rgba(0,0,0,0.5);
+      --transition: 0.25s cubic-bezier(.4,0,.2,1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── Background Decoration ─────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(78,205,196,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 80%, rgba(232,201,122,0.06) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── Utility ───────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+
+    /* ─── Loading Screen ────────────────────────────────── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 999;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px;
+    }
+    #loading-screen .logo-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3rem; font-weight: 600;
+      color: var(--gold);
+      letter-spacing: 0.05em;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Auth Screen ───────────────────────────────────── */
+    #auth-screen {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      position: relative; z-index: 1;
+    }
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px 40px;
+      width: 100%; max-width: 420px;
+      box-shadow: var(--shadow);
+      animation: fadeUp 0.5s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .auth-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.4rem; font-weight: 600;
+      color: var(--gold);
+      text-align: center;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .auth-tagline {
+      text-align: center; color: var(--muted);
+      font-size: 0.85rem; margin-bottom: 36px;
+      font-style: italic;
+    }
+    .auth-tabs {
+      display: flex; gap: 0;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .auth-tab {
+      flex: 1; padding: 9px;
+      border: none; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem; font-weight: 500;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .auth-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 0.78rem;
+      font-weight: 500; color: var(--muted);
+      margin-bottom: 7px; letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .form-group input {
+      width: 100%; padding: 13px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      outline: none;
+      transition: var(--transition);
+    }
+    .form-group input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(232,201,122,0.12);
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px;
+      padding: 13px 24px;
+      border: none; border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem; font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      text-decoration: none;
+    }
+    .btn-primary {
+      width: 100%; background: var(--gold);
+      color: #1a1407; margin-top: 8px;
+    }
+    .btn-primary:hover { background: var(--gold2); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-google {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text); margin-top: 12px;
+    }
+    .btn-google:hover { background: rgba(255,255,255,0.06); }
+    .btn-icon { width: 18px; height: 18px; }
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 20px 0; color: var(--muted); font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1;
+      height: 1px; background: var(--border);
+    }
+    .auth-error {
+      background: rgba(255,107,138,0.12);
+      border: 1px solid rgba(255,107,138,0.3);
+      border-radius: var(--radius-sm);
+      color: var(--rose); font-size: 0.85rem;
+      padding: 10px 14px; margin-top: 12px;
+    }
+
+    /* ─── App Shell ─────────────────────────────────────── */
+    #app {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      position: relative; z-index: 1;
+    }
+
+    /* Header */
+    .app-header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,26,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex; align-items: center;
+      height: 64px; gap: 16px;
+    }
+    .header-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem; font-weight: 600;
+      color: var(--gold); letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+    .header-spacer { flex: 1; }
+    .header-user {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted); font-size: 0.85rem;
+    }
+    .header-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--teal), var(--gold));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; color: #0f0f1a;
+      flex-shrink: 0;
+    }
+    .btn-logout {
+      padding: 7px 14px; background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px; color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem; cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-logout:hover { border-color: var(--rose); color: var(--rose); }
+
+    /* Nav Tabs */
+    .app-nav {
+      display: flex; gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      background: rgba(15,15,26,0.5);
+      backdrop-filter: blur(8px);
+    }
+    .nav-tab {
+      padding: 14px 24px;
+      border: none; background: transparent;
+      color: var(--muted); font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem; font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: var(--transition);
+      display: flex; align-items: center; gap: 7px;
+    }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .nav-badge {
+      background: var(--gold); color: #1a1407;
+      border-radius: 20px; padding: 1px 7px;
+      font-size: 0.72rem; font-weight: 600;
+    }
+
+    /* Content */
+    .app-content {
+      flex: 1; padding: 32px 24px;
+      max-width: 900px; width: 100%; margin: 0 auto;
+    }
+
+    /* ─── Cards View ────────────────────────────────────── */
+    .section-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 24px;
+      flex-wrap: wrap; gap: 12px;
+    }
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem; font-weight: 600;
+      color: var(--text);
+    }
+    .btn-add {
+      padding: 10px 20px;
+      background: var(--gold); color: #1a1407;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem; font-weight: 600;
+      border: none; cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-add:hover { background: var(--gold2); transform: translateY(-1px); }
+
+    /* Add/Edit Form */
+    .card-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px; margin-bottom: 28px;
+      animation: fadeUp 0.3s ease;
+    }
+    .card-form-title {
+      font-size: 1rem; font-weight: 600;
+      margin-bottom: 16px; color: var(--gold);
+    }
+    .form-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 14px; margin-bottom: 16px;
+    }
+    @media (max-width: 580px) { .form-row { grid-template-columns: 1fr; } }
+    .form-row input, .card-form textarea {
+      width: 100%; padding: 12px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 0.92rem;
+      outline: none; transition: var(--transition);
+      resize: vertical;
+    }
+    .form-row input:focus, .card-form textarea:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(232,201,122,0.1);
+    }
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-save {
+      padding: 10px 22px; background: var(--gold);
+      color: #1a1407; border: none; border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: var(--transition);
+    }
+    .btn-save:hover { background: var(--gold2); }
+    .btn-cancel {
+      padding: 10px 22px; background: transparent;
+      color: var(--muted); border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+      cursor: pointer; transition: var(--transition);
+    }
+    .btn-cancel:hover { color: var(--text); border-color: var(--muted); }
+
+    /* Card List */
+    .cards-search {
+      width: 100%; padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 0.92rem;
+      outline: none; margin-bottom: 20px;
+      transition: var(--transition);
+    }
+    .cards-search:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(232,201,122,0.1);
+    }
+    .cards-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .vocab-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: var(--transition);
+      position: relative;
+    }
+    .vocab-card:hover {
+      border-color: rgba(232,201,122,0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+    }
+    .vocab-card-word {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem; font-weight: 600;
+      color: var(--text); margin-bottom: 6px;
+    }
+    .vocab-card-meaning {
+      font-size: 0.88rem; color: var(--muted);
+      line-height: 1.5; margin-bottom: 14px;
+    }
+    .vocab-card-stats {
+      display: flex; gap: 12px;
+      font-size: 0.78rem; margin-bottom: 14px;
+    }
+    .stat-pill {
+      padding: 3px 10px; border-radius: 20px;
+      font-weight: 500;
+    }
+    .stat-correct { background: rgba(78,205,196,0.15); color: var(--teal); }
+    .stat-incorrect { background: rgba(255,107,138,0.15); color: var(--rose); }
+    .vocab-card-actions {
+      display: flex; gap: 8px;
+    }
+    .btn-edit, .btn-delete {
+      padding: 6px 14px; border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem; font-weight: 500;
+      cursor: pointer; transition: var(--transition);
+      border: 1px solid var(--border);
+    }
+    .btn-edit { background: transparent; color: var(--muted); }
+    .btn-edit:hover { color: var(--gold); border-color: var(--gold); }
+    .btn-delete { background: transparent; color: var(--muted); }
+    .btn-delete:hover { color: var(--rose); border-color: var(--rose); }
+    .empty-state {
+      text-align: center; padding: 64px 24px;
+      color: var(--muted);
+    }
+    .empty-state-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+    .empty-state h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    /* ─── Study Mode ────────────────────────────────────── */
+    .study-controls {
+      display: flex; gap: 10px;
+      margin-bottom: 28px; flex-wrap: wrap;
+    }
+    .btn-control {
+      padding: 9px 18px; border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem; font-weight: 500;
+      cursor: pointer; transition: var(--transition);
+      border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted);
+    }
+    .btn-control:hover { color: var(--text); border-color: var(--muted); }
+    .btn-control.active {
+      background: rgba(232,201,122,0.12);
+      border-color: var(--gold); color: var(--gold);
+    }
+
+    /* Progress Bar */
+    .study-progress {
+      margin-bottom: 32px;
+    }
+    .progress-info {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 10px;
+      font-size: 0.85rem; color: var(--muted);
+    }
+    .progress-fraction {
+      font-family: 'DM Mono', monospace;
+      color: var(--gold);
+    }
+    .progress-bar-track {
+      height: 4px; background: var(--surface2);
+      border-radius: 4px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--teal), var(--gold));
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    /* Flip Card */
+    .flip-scene {
+      perspective: 1200px;
+      width: 100%; max-width: 580px;
+      margin: 0 auto 36px;
+      height: 280px; cursor: pointer;
+    }
+    .flip-card {
+      width: 100%; height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+    }
+    .flip-card.flipped { transform: rotateY(180deg); }
+    .flip-face {
+      position: absolute; inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 20px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 36px;
+      text-align: center;
+    }
+    .flip-front {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .flip-back {
+      background: linear-gradient(135deg, #1a2e2e, #1e1e2e);
+      border: 1px solid rgba(78,205,196,0.25);
+      box-shadow: var(--shadow), 0 0 40px rgba(78,205,196,0.05);
+      transform: rotateY(180deg);
+    }
+    .card-label {
+      font-size: 0.72rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 16px; font-weight: 500;
+    }
+    .card-word {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.4rem; font-weight: 600;
+      color: var(--text); line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .card-hint { font-size: 0.82rem; color: var(--muted); font-style: italic; }
+    .card-meaning {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem; font-weight: 400;
+      color: var(--teal); line-height: 1.4;
+    }
+
+    /* Answer Buttons */
+    .answer-buttons {
+      display: flex; gap: 14px;
+      justify-content: center; margin-bottom: 24px;
+    }
+    .btn-correct, .btn-incorrect {
+      padding: 14px 36px; border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: var(--transition);
+      border: none; flex: 1; max-width: 200px;
+    }
+    .btn-correct {
+      background: rgba(78,205,196,0.15);
+      color: var(--teal);
+      border: 1px solid rgba(78,205,196,0.35);
+    }
+    .btn-correct:hover {
+      background: var(--teal); color: #0f0f1a;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(78,205,196,0.3);
+    }
+    .btn-incorrect {
+      background: rgba(255,107,138,0.12);
+      color: var(--rose);
+      border: 1px solid rgba(255,107,138,0.3);
+    }
+    .btn-incorrect:hover {
+      background: var(--rose); color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255,107,138,0.3);
+    }
+    .btn-reveal {
+      display: block; width: 100%; max-width: 300px;
+      margin: 0 auto 24px;
+      padding: 13px 24px;
+      background: var(--surface);
+      border: 1px dashed rgba(232,201,122,0.4);
+      border-radius: var(--radius-sm);
+      color: var(--gold); font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem; cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-reveal:hover {
+      background: rgba(232,201,122,0.08);
+      border-style: solid;
+    }
+
+    /* Session Complete */
+    .session-complete {
+      text-align: center; padding: 48px 24px;
+      animation: fadeUp 0.5s ease;
+    }
+    .session-complete-icon { font-size: 4rem; margin-bottom: 20px; }
+    .session-complete h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.2rem; margin-bottom: 10px;
+    }
+    .session-complete p { color: var(--muted); margin-bottom: 32px; }
+    .session-results {
+      display: flex; gap: 20px; justify-content: center;
+      flex-wrap: wrap; margin-bottom: 32px;
+    }
+    .result-pill {
+      padding: 12px 24px; border-radius: var(--radius);
+      font-size: 1.1rem; font-weight: 600;
+    }
+    .result-pill.correct {
+      background: rgba(78,205,196,0.15); color: var(--teal);
+      border: 1px solid rgba(78,205,196,0.3);
+    }
+    .result-pill.incorrect {
+      background: rgba(255,107,138,0.12); color: var(--rose);
+      border: 1px solid rgba(255,107,138,0.3);
+    }
+    .session-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    /* ─── Stats View ────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px; margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+      transition: var(--transition);
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3rem; font-weight: 600;
+      color: var(--gold); line-height: 1;
+      margin-bottom: 8px;
+    }
+    .stat-card-label {
+      font-size: 0.8rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .accuracy-ring {
+      width: 160px; height: 160px;
+      margin: 0 auto 32px;
+    }
+    .accuracy-ring svg { width: 100%; height: 100%; }
+    .ring-track { fill: none; stroke: var(--surface2); stroke-width: 12; }
+    .ring-fill {
+      fill: none; stroke-width: 12;
+      stroke: var(--gold);
+      stroke-linecap: round;
+      stroke-dasharray: 439.8;
+      stroke-dashoffset: 439.8;
+      transition: stroke-dashoffset 1s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    .ring-text-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem; font-weight: 600; fill: var(--gold);
+    }
+    .ring-text-label { font-size: 0.65rem; fill: var(--muted); }
+    .reset-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 16px;
+    }
+    .reset-info h3 { font-size: 1rem; margin-bottom: 4px; }
+    .reset-info p { font-size: 0.85rem; color: var(--muted); }
+    .btn-reset {
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid rgba(255,107,138,0.4);
+      border-radius: var(--radius-sm);
+      color: var(--rose);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem; font-weight: 500;
+      cursor: pointer; transition: var(--transition);
+    }
+    .btn-reset:hover {
+      background: rgba(255,107,138,0.1);
+    }
+
+    /* ─── Toast ─────────────────────────────────────────── */
+    #toast-container {
+      position: fixed; bottom: 24px; right: 24px;
+      z-index: 9999; display: flex;
+      flex-direction: column-reverse; gap: 10px;
+    }
+    .toast {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      font-size: 0.88rem; color: var(--text);
+      box-shadow: var(--shadow);
+      animation: slideIn 0.3s ease;
+      max-width: 300px;
+    }
+    .toast.success { border-left: 3px solid var(--teal); }
+    .toast.error { border-left: 3px solid var(--rose); }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ─── Modal ─────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 32px;
+      width: 100%; max-width: 400px;
+      box-shadow: var(--shadow);
+      animation: fadeUp 0.3s ease;
+    }
+    .modal h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; margin-bottom: 10px;
+    }
+    .modal p { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-danger {
+      padding: 10px 20px;
+      background: var(--rose); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem; font-weight: 500;
+      cursor: pointer; transition: var(--transition);
+    }
+    .btn-danger:hover { opacity: 0.9; }
+
+    /* ─── Responsive ─────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .app-content { padding: 20px 16px; }
+      .auth-card { padding: 32px 24px; }
+      .flip-scene { height: 220px; }
+      .card-word { font-size: 1.8rem; }
+      .answer-buttons { flex-direction: column; align-items: center; }
+      .btn-correct, .btn-incorrect { max-width: 100%; width: 100%; }
+      .app-nav { padding: 0 12px; overflow-x: auto; }
+      .nav-tab { padding: 14px 16px; font-size: 0.85rem; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── Loading Screen ──────────────────────────── -->
+<div id="loading-screen">
+  <div class="logo-text">Mnemo</div>
+  <div class="spinner"></div>
+</div>
+
+<!-- ─── Auth Screen ─────────────────────────────── -->
+<div id="auth-screen" class="hidden">
+  <div class="auth-card">
+    <div class="auth-logo">Mnemo</div>
+    <div class="auth-tagline">Your intelligent flashcard studio</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Register</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-form">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button class="btn btn-primary" onclick="handleLogin()">Sign In</button>
+      <div class="divider">or</div>
+      <button class="btn btn-google" onclick="handleGoogleSignIn()">
+        <svg class="btn-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <div id="login-error" class="auth-error hidden"></div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-form" class="hidden">
+      <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" id="reg-name" placeholder="Your name" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="reg-password" placeholder="Min. 6 characters" autocomplete="new-password" />
+      </div>
+      <button class="btn btn-primary" onclick="handleRegister()">Create Account</button>
+      <div class="divider">or</div>
+      <button class="btn btn-google" onclick="handleGoogleSignIn()">
+        <svg class="btn-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <div id="register-error" class="auth-error hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Main App ────────────────────────────────── -->
+<div id="app" class="hidden">
+  <header class="app-header">
+    <div class="header-logo">Mnemo</div>
+    <div class="header-spacer"></div>
+    <div class="header-user">
+      <div class="header-avatar" id="user-avatar">?</div>
+      <span id="user-name" style="display:none"></span>
+      <button class="btn-logout" onclick="handleLogout()">Sign Out</button>
+    </div>
+  </header>
+
+  <nav class="app-nav">
+    <button class="nav-tab active" id="nav-study" onclick="showTab('study')">
+      📖 Study
+    </button>
+    <button class="nav-tab" id="nav-cards" onclick="showTab('cards')">
+      🗂 Cards <span class="nav-badge" id="card-count-badge">0</span>
+    </button>
+    <button class="nav-tab" id="nav-stats" onclick="showTab('stats')">
+      📊 Stats
+    </button>
+  </nav>
+
+  <main class="app-content">
+
+    <!-- ─── Study Tab ─────────────────── -->
+    <div id="tab-study">
+      <div class="section-header">
+        <h1 class="section-title">Study Session</h1>
+      </div>
+
+      <!-- No cards state -->
+      <div id="study-no-cards" class="empty-state hidden">
+        <div class="empty-state-icon">📚</div>
+        <h3>No cards to study</h3>
+        <p>Add some flashcards in the Cards tab to get started.</p>
+      </div>
+
+      <!-- Study UI -->
+      <div id="study-ui" class="hidden">
+        <div class="study-controls">
+          <button class="btn-control" id="btn-shuffle" onclick="toggleShuffle()">🔀 Shuffle</button>
+          <button class="btn-control" id="btn-incorrect-only" onclick="toggleIncorrectOnly()">❌ Wrong Only</button>
+          <button class="btn-control" onclick="restartSession()">↩ Restart</button>
+        </div>
+
+        <div class="study-progress">
+          <div class="progress-info">
+            <span id="progress-text">Card 1 of 10</span>
+            <span class="progress-fraction" id="session-score">✓ 0  ✗ 0</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Flip Card -->
+        <div class="flip-scene" onclick="revealCard()">
+          <div class="flip-card" id="flip-card">
+            <div class="flip-face flip-front">
+              <div class="card-label">Word</div>
+              <div class="card-word" id="study-word">—</div>
+              <div class="card-hint">tap to reveal</div>
+            </div>
+            <div class="flip-face flip-back">
+              <div class="card-label">Meaning</div>
+              <div class="card-meaning" id="study-meaning">—</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-reveal" id="reveal-btn" onclick="revealCard()">Reveal Answer</button>
+
+        <div class="answer-buttons hidden" id="answer-buttons">
+          <button class="btn-incorrect" onclick="answerCard(false)">✗ Incorrect</button>
+          <button class="btn-correct" onclick="answerCard(true)">✓ Correct</button>
+        </div>
+      </div>
+
+      <!-- Session Complete -->
+      <div id="session-complete" class="session-complete hidden">
+        <div class="session-complete-icon">🎉</div>
+        <h2>Session Complete!</h2>
+        <p>Here's how you did this round:</p>
+        <div class="session-results">
+          <div class="result-pill correct" id="result-correct">✓ 0 Correct</div>
+          <div class="result-pill incorrect" id="result-incorrect">✗ 0 Incorrect</div>
+        </div>
+        <div class="session-actions">
+          <button class="btn-control" onclick="startSession()">Study Again</button>
+          <button class="btn-control" onclick="startIncorrectSession()">Review Mistakes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Cards Tab ──────────────────── -->
+    <div id="tab-cards" class="hidden">
+      <div class="section-header">
+        <h1 class="section-title">My Cards</h1>
+        <button class="btn-add" onclick="showAddForm()">+ Add Card</button>
+      </div>
+
+      <!-- Add / Edit Form -->
+      <div class="card-form hidden" id="card-form">
+        <div class="card-form-title" id="form-title">New Flashcard</div>
+        <div class="form-row">
+          <input type="text" id="input-word" placeholder="Word / Term" />
+          <input type="text" id="input-meaning" placeholder="Meaning / Definition" />
+        </div>
+        <textarea id="input-notes" rows="2" placeholder="Optional notes or example sentence..." style="margin-bottom:16px"></textarea>
+        <div class="form-actions">
+          <button class="btn-cancel" onclick="hideForm()">Cancel</button>
+          <button class="btn-save" onclick="saveCard()">Save Card</button>
+        </div>
+        <input type="hidden" id="editing-card-id" />
+      </div>
+
+      <!-- Search -->
+      <input type="search" class="cards-search" id="cards-search"
+        placeholder="🔍 Search cards..."
+        oninput="renderCardsList()" />
+
+      <!-- Cards Grid -->
+      <div class="cards-list" id="cards-list"></div>
+      <div class="empty-state hidden" id="cards-empty">
+        <div class="empty-state-icon">🗂</div>
+        <h3>No flashcards yet</h3>
+        <p>Click "Add Card" to create your first flashcard.</p>
+      </div>
+    </div>
+
+    <!-- ─── Stats Tab ──────────────────── -->
+    <div id="tab-stats" class="hidden">
+      <div class="section-header">
+        <h1 class="section-title">Statistics</h1>
+      </div>
+
+      <div style="text-align:center; margin-bottom:24px;">
+        <div class="accuracy-ring">
+          <svg viewBox="0 0 160 160">
+            <circle class="ring-track" cx="80" cy="80" r="70" />
+            <circle class="ring-fill" id="ring-fill" cx="80" cy="80" r="70" />
+            <text class="ring-text-value" id="ring-value" x="80" y="75" text-anchor="middle" dominant-baseline="middle">0%</text>
+            <text class="ring-text-label" x="80" y="98" text-anchor="middle" fill="#8a8a9a">Accuracy</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-value" id="stat-total">0</div>
+          <div class="stat-card-label">Total Cards</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" id="stat-studied" style="color:var(--teal)">0</div>
+          <div class="stat-card-label">Cards Studied</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" id="stat-correct" style="color:var(--teal)">0</div>
+          <div class="stat-card-label">Total Correct</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-value" id="stat-incorrect" style="color:var(--rose)">0</div>
+          <div class="stat-card-label">Total Incorrect</div>
+        </div>
+      </div>
+
+      <div class="reset-section">
+        <div class="reset-info">
+          <h3>Reset Progress</h3>
+          <p>Clear all correct/incorrect counts for every card.</p>
+        </div>
+        <button class="btn-reset" onclick="showResetModal()">Reset All Progress</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─── Modal ──────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">Confirm Action</h3>
+    <p id="modal-message">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-danger" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Toast Container ────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ─── Firebase SDK ───────────────────────────── -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, signOut, updateProfile,
+    GoogleAuthProvider, signInWithPopup
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import {
+    getFirestore, collection, doc, addDoc, setDoc, updateDoc,
+    deleteDoc, onSnapshot, query, orderBy, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ─────────────────────────────────────────────────────
+  // 🔥 FIREBASE CONFIGURATION — Replace with YOUR config
+  // ─────────────────────────────────────────────────────
+  const firebaseConfig = {
+  apiKey: "AIzaSyBCdFSr4FbZ4qwr5M3EvUeBXvlDMBqdNzY",
+  authDomain: "bossflash-ebe29.firebaseapp.com",
+  projectId: "bossflash-ebe29",
+  storageBucket: "bossflash-ebe29.firebasestorage.app",
+  messagingSenderId: "572329225964",
+  appId: "1:572329225964:web:c0fad18f28873399467fc9"
+};
+  // ─────────────────────────────────────────────────────
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  let currentUser   = null;
+  let flashcards    = [];       // live array from Firestore
+  let unsubCards    = null;     // Firestore listener unsubscribe fn
+
+  // ── Study state ──────────────────────────────────────
+  let studyQueue    = [];
+  let studyIndex    = 0;
+  let isFlipped     = false;
+  let sessionCorrect   = 0;
+  let sessionIncorrect = 0;
+  let shuffleMode   = false;
+  let incorrectOnly = false;
+
+  // ─── Expose functions to global scope ────────────────
+  Object.assign(window, {
+    switchAuthTab, handleLogin, handleRegister, handleGoogleSignIn, handleLogout,
+    showTab, showAddForm, hideForm, saveCard, deleteCard, editCard,
+    renderCardsList,
+    toggleShuffle, toggleIncorrectOnly, restartSession, startSession,
+    startIncorrectSession, revealCard, answerCard,
+    showResetModal, closeModal,
+  });
+
+  // ─── Auth State Observer ─────────────────────────────
+  onAuthStateChanged(auth, user => {
+    hide('loading-screen');
+    if (user) {
+      currentUser = user;
+      show('app'); hide('auth-screen');
+      setupUserUI(user);
+      subscribeToCards(user.uid);
+      showTab('study');
+    } else {
+      currentUser = null;
+      flashcards  = [];
+      if (unsubCards) { unsubCards(); unsubCards = null; }
+      hide('app'); show('auth-screen');
+    }
+  });
+
+  function setupUserUI(user) {
+    const name   = user.displayName || user.email.split('@')[0];
+    const initials = name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+    el('user-avatar').textContent = initials;
+    el('user-name').textContent = name;
+  }
+
+  // ─── Firestore Real-time Listener ────────────────────
+  function subscribeToCards(uid) {
+    if (unsubCards) unsubCards();
+    const q = query(
+      collection(db, 'users', uid, 'cards'),
+      orderBy('createdAt', 'asc')
+    );
+    unsubCards = onSnapshot(q, snap => {
+      flashcards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      el('card-count-badge').textContent = flashcards.length;
+      renderCardsList();
+      updateStats();
+      // If study tab is active and queue not started, refresh
+      if (studyQueue.length === 0) buildStudyQueue();
+    }, err => {
+      toast('Firestore error: ' + err.message, 'error');
+    });
+  }
+
+  // ─── Auth Handlers ───────────────────────────────────
+  function switchAuthTab(tab) {
+    el('tab-login').classList.toggle('active', tab === 'login');
+    el('tab-register').classList.toggle('active', tab === 'register');
+    toggleVisibility('login-form', tab === 'login');
+    toggleVisibility('register-form', tab === 'register');
+  }
+
+  async function handleLogin() {
+    const email = el('login-email').value.trim();
+    const pass  = el('login-password').value;
+    hide('login-error');
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch(e) {
+      showError('login-error', friendlyError(e));
+    }
+  }
+
+  async function handleRegister() {
+    const name  = el('reg-name').value.trim();
+    const email = el('reg-email').value.trim();
+    const pass  = el('reg-password').value;
+    hide('register-error');
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      if (name) await updateProfile(cred.user, { displayName: name });
+    } catch(e) {
+      showError('register-error', friendlyError(e));
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch(e) {
+      showError('login-error', friendlyError(e));
+      showError('register-error', friendlyError(e));
+    }
+  }
+
+  async function handleLogout() {
+    await signOut(auth);
+    toast('Signed out successfully.');
+  }
+
+  // ─── Tab Navigation ──────────────────────────────────
+  function showTab(tab) {
+    ['study','cards','stats'].forEach(t => {
+      toggleVisibility(`tab-${t}`, t === tab);
+      el(`nav-${t}`).classList.toggle('active', t === tab);
+    });
+    if (tab === 'study')  initStudyTab();
+    if (tab === 'stats')  updateStats();
+  }
+
+  // ─── Cards Management ────────────────────────────────
+  function showAddForm() {
+    el('form-title').textContent = 'New Flashcard';
+    el('input-word').value    = '';
+    el('input-meaning').value = '';
+    el('input-notes').value   = '';
+    el('editing-card-id').value = '';
+    show('card-form');
+    el('input-word').focus();
+  }
+
+  function hideForm() { hide('card-form'); }
+
+  async function saveCard() {
+    const word    = el('input-word').value.trim();
+    const meaning = el('input-meaning').value.trim();
+    const notes   = el('input-notes').value.trim();
+    const editId  = el('editing-card-id').value;
+
+    if (!word || !meaning) {
+      toast('Please fill in both word and meaning.', 'error'); return;
+    }
+    if (!currentUser) return;
+
+    try {
+      const data = { word, meaning, notes, correct: 0, incorrect: 0 };
+      const ref  = collection(db, 'users', currentUser.uid, 'cards');
+      if (editId) {
+        await updateDoc(doc(db, 'users', currentUser.uid, 'cards', editId), data);
+        toast('Card updated! ✏️');
+      } else {
+        data.createdAt = serverTimestamp();
+        await addDoc(ref, data);
+        toast('Card added! 🎉');
+      }
+      hideForm();
+    } catch(e) {
+      toast('Error saving card: ' + e.message, 'error');
+    }
+  }
+
+  function editCard(id) {
+    const card = flashcards.find(c => c.id === id);
+    if (!card) return;
+    el('form-title').textContent = 'Edit Flashcard';
+    el('input-word').value     = card.word;
+    el('input-meaning').value  = card.meaning;
+    el('input-notes').value    = card.notes || '';
+    el('editing-card-id').value = id;
+    show('card-form');
+    el('input-word').focus();
+  }
+
+  function deleteCard(id) {
+    openModal('Delete Card', 'Are you sure you want to delete this card? This cannot be undone.', async () => {
+      try {
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'cards', id));
+        toast('Card deleted.');
+      } catch(e) {
+        toast('Error deleting card: ' + e.message, 'error');
+      }
+    });
+  }
+
+  function renderCardsList() {
+    const search = (el('cards-search').value || '').toLowerCase();
+    const filtered = flashcards.filter(c =>
+      c.word.toLowerCase().includes(search) ||
+      c.meaning.toLowerCase().includes(search)
+    );
+    const list = el('cards-list');
+    if (filtered.length === 0) {
+      list.innerHTML = '';
+      show('cards-empty'); return;
+    }
+    hide('cards-empty');
+    list.innerHTML = filtered.map(c => `
+      <div class="vocab-card" data-id="${c.id}">
+        <div class="vocab-card-word">${esc(c.word)}</div>
+        <div class="vocab-card-meaning">${esc(c.meaning)}</div>
+        <div class="vocab-card-stats">
+          <span class="stat-pill stat-correct">✓ ${c.correct || 0}</span>
+          <span class="stat-pill stat-incorrect">✗ ${c.incorrect || 0}</span>
+        </div>
+        <div class="vocab-card-actions">
+          <button class="btn-edit" onclick="editCard('${c.id}')">Edit</button>
+          <button class="btn-delete" onclick="deleteCard('${c.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ─── Study Mode ──────────────────────────────────────
+  function initStudyTab() {
+    if (flashcards.length === 0) {
+      show('study-no-cards'); hide('study-ui'); hide('session-complete'); return;
+    }
+    hide('study-no-cards');
+    if (studyQueue.length === 0 || studyIndex >= studyQueue.length) {
+      buildStudyQueue();
+    } else {
+      showStudyCard();
+    }
+  }
+
+  function buildStudyQueue() {
+    sessionCorrect = 0; sessionIncorrect = 0;
+    let pool = incorrectOnly
+      ? flashcards.filter(c => (c.incorrect || 0) > 0)
+      : [...flashcards];
+
+    if (pool.length === 0 && incorrectOnly) {
+      toast('No incorrect cards yet. Switching to all cards.');
+      incorrectOnly = false;
+      el('btn-incorrect-only').classList.remove('active');
+      pool = [...flashcards];
+    }
+
+    // Spaced repetition: weight incorrect cards higher
+    const weighted = [];
+    pool.forEach(c => {
+      const weight = 1 + Math.min((c.incorrect || 0), 4);
+      for (let i = 0; i < weight; i++) weighted.push(c);
+    });
+
+    if (shuffleMode) {
+      for (let i = weighted.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [weighted[i], weighted[j]] = [weighted[j], weighted[i]];
+      }
+    }
+
+    // Deduplicate but keep weighted order
+    const seen = new Set();
+    studyQueue = weighted.filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id); return true;
+    });
+
+    studyIndex = 0;
+    show('study-ui'); hide('session-complete'); hide('study-no-cards');
+    showStudyCard();
+  }
+
+  function showStudyCard() {
+    if (studyIndex >= studyQueue.length) {
+      endSession(); return;
+    }
+    const card = studyQueue[studyIndex];
+    el('study-word').textContent    = card.word;
+    el('study-meaning').textContent = card.meaning;
+
+    // Reset flip
+    isFlipped = false;
+    el('flip-card').classList.remove('flipped');
+    show('reveal-btn');
+    hide('answer-buttons');
+
+    // Update progress
+    const total = studyQueue.length;
+    const pct   = Math.round((studyIndex / total) * 100);
+    el('progress-text').textContent  = `Card ${studyIndex + 1} of ${total}`;
+    el('session-score').textContent  = `✓ ${sessionCorrect}  ✗ ${sessionIncorrect}`;
+    el('progress-bar').style.width   = pct + '%';
+  }
+
+  function revealCard() {
+    if (isFlipped) return;
+    isFlipped = true;
+    el('flip-card').classList.add('flipped');
+    hide('reveal-btn');
+    show('answer-buttons');
+  }
+
+  async function answerCard(correct) {
+    const card = studyQueue[studyIndex];
+    if (!card || !currentUser) { studyIndex++; showStudyCard(); return; }
+
+    if (correct) sessionCorrect++; else sessionIncorrect++;
+
+    try {
+      const cardRef = doc(db, 'users', currentUser.uid, 'cards', card.id);
+      const field   = correct ? 'correct' : 'incorrect';
+      const current = card[field] || 0;
+      await updateDoc(cardRef, { [field]: current + 1 });
+    } catch(e) { /* non-critical */ }
+
+    studyIndex++;
+    setTimeout(showStudyCard, 200);
+  }
+
+  function endSession() {
+    el('result-correct').textContent   = `✓ ${sessionCorrect} Correct`;
+    el('result-incorrect').textContent = `✗ ${sessionIncorrect} Incorrect`;
+    hide('study-ui'); show('session-complete');
+  }
+
+  function restartSession() {
+    studyQueue = []; studyIndex = 0;
+    buildStudyQueue();
+  }
+
+  function startSession() {
+    incorrectOnly = false;
+    el('btn-incorrect-only').classList.remove('active');
+    restartSession();
+  }
+
+  function startIncorrectSession() {
+    incorrectOnly = true;
+    el('btn-incorrect-only').classList.add('active');
+    restartSession();
+  }
+
+  function toggleShuffle() {
+    shuffleMode = !shuffleMode;
+    el('btn-shuffle').classList.toggle('active', shuffleMode);
+    toast(shuffleMode ? 'Shuffle on 🔀' : 'Shuffle off');
+    restartSession();
+  }
+
+  function toggleIncorrectOnly() {
+    incorrectOnly = !incorrectOnly;
+    el('btn-incorrect-only').classList.toggle('active', incorrectOnly);
+    toast(incorrectOnly ? 'Showing incorrect only ❌' : 'Showing all cards');
+    restartSession();
+  }
+
+  // ─── Stats ───────────────────────────────────────────
+  function updateStats() {
+    const total     = flashcards.length;
+    const correct   = flashcards.reduce((s,c) => s + (c.correct   || 0), 0);
+    const incorrect = flashcards.reduce((s,c) => s + (c.incorrect || 0), 0);
+    const studied   = flashcards.filter(c => (c.correct||0)+(c.incorrect||0) > 0).length;
+    const accuracy  = (correct + incorrect) > 0
+      ? Math.round(correct / (correct + incorrect) * 100) : 0;
+
+    el('stat-total').textContent     = total;
+    el('stat-correct').textContent   = correct;
+    el('stat-incorrect').textContent = incorrect;
+    el('stat-studied').textContent   = studied;
+    el('ring-value').textContent     = accuracy + '%';
+
+    // Animate ring: circumference = 2π × 70 ≈ 439.8
+    const offset = 439.8 - (439.8 * accuracy / 100);
+    el('ring-fill').style.strokeDashoffset = offset;
+  }
+
+  function showResetModal() {
+    openModal('Reset Progress',
+      'This will clear all correct/incorrect counts. Study streaks will be lost.',
+      async () => {
+        try {
+          const batch = [];
+          flashcards.forEach(c => {
+            batch.push(updateDoc(doc(db, 'users', currentUser.uid, 'cards', c.id),
+              { correct: 0, incorrect: 0 }));
+          });
+          await Promise.all(batch);
+          toast('Progress reset! 🔄');
+          updateStats();
+        } catch(e) {
+          toast('Error resetting: ' + e.message, 'error');
+        }
+      }
+    );
+  }
+
+  // ─── Modal ───────────────────────────────────────────
+  let modalCallback = null;
+  function openModal(title, message, cb) {
+    el('modal-title').textContent   = title;
+    el('modal-message').textContent = message;
+    modalCallback = cb;
+    el('modal-confirm').onclick = () => { closeModal(); if (modalCallback) modalCallback(); };
+    show('modal-overlay');
+  }
+  function closeModal() { hide('modal-overlay'); }
+
+  // ─── Toast ───────────────────────────────────────────
+  function toast(msg, type = 'success') {
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.textContent = msg;
+    el('toast-container').appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  // ─── Helpers ─────────────────────────────────────────
+  const el  = id => document.getElementById(id);
+  const show = id => el(id)?.classList.remove('hidden');
+  const hide = id => el(id)?.classList.add('hidden');
+  const toggleVisibility = (id, show) =>
+    el(id)?.classList.toggle('hidden', !show);
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showError(id, msg) {
+    const e = el(id); e.textContent = msg; show(id);
+  }
+
+  function friendlyError(e) {
+    const map = {
+      'auth/user-not-found':       'No account found with this email.',
+      'auth/wrong-password':       'Incorrect password.',
+      'auth/email-already-in-use': 'An account already exists with this email.',
+      'auth/weak-password':        'Password must be at least 6 characters.',
+      'auth/invalid-email':        'Please enter a valid email address.',
+      'auth/popup-closed-by-user': 'Sign-in popup was closed.',
+    };
+    return map[e.code] || e.message;
+  }
+
+  // ─── PWA Service Worker ──────────────────────────────
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      const CACHE = 'mnemo-v1';
+      const ASSETS = [location.href];
+      self.addEventListener('install', e => {
+        e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      });
+      self.addEventListener('fetch', e => {
+        e.respondWith(
+          caches.match(e.request).then(r => r || fetch(e.request))
+        );
+      });
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).catch(() => {});
+  }
+
+  // ─── PWA Manifest (injected) ──────────────────────────
+  const manifest = {
+    name: 'Mnemo — Flashcard Studio',
+    short_name: 'Mnemo',
+    description: 'Cloud-synced flashcard study app',
+    start_url: '.',
+    display: 'standalone',
+    background_color: '#0f0f1a',
+    theme_color: '#e8c97a',
+    icons: [{
+      src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a1a2e" rx="20"/><text y=".9em" font-size="80" x="10">📖</text></svg>',
+      sizes: '512x512', type: 'image/svg+xml'
+    }]
+  };
+  const mBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+  document.getElementById('pwa-manifest').href = URL.createObjectURL(mBlob);
+
+</script>
+</body>
+</html>
